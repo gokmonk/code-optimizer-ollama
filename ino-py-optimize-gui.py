@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QWidget,
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QFont, QAction, QIcon, QTextOption, QColor, QPalette, QSyntaxHighlighter, QTextCharFormat
 import time
+from secure_settings import SecureSettings
 
 class AIWorker(QThread):
     response_received = pyqtSignal(str)
@@ -665,27 +666,22 @@ Return ONLY the improved code with inline comments in a code block.
 class CodeOptimizerApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Multi-Language Code Optimizer with AI")
+        self.setWindowTitle("Code Optimizer")
         self.setGeometry(100, 100, 1200, 800)
         
-        self.ollama_models = self.get_installed_ollama_models()
-        self.deepseek_models = ["deepseek-coder-33b-instruct", "deepseek-coder-6.7b-instruct"]
-        self.claude_models = ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-2.1"]
-        self.openai_models = ["gpt-4-turbo-preview", "gpt-4", "gpt-3.5-turbo"]
-        self.chatgpt_models = ["gpt-4", "gpt-3.5-turbo"]
+        # Initialize secure settings
+        self.settings_manager = SecureSettings()
+        self.settings_manager.migrate_env_to_secure()
         
-        self.current_model = self.ollama_models[0] if self.ollama_models else ""
-        self.current_ai = "ollama" if self.ollama_models else "deepseek"
-        self.current_file_type = "python"
+        # Get API keys from secure storage
+        self.claude_api_key = self.settings_manager.get_api_key('anthropic')
+        self.openai_api_key = self.settings_manager.get_api_key('openai')
+        self.deepseek_api_key = self.settings_manager.get_api_key('deepseek')
+        self.chatgpt_api_key = self.settings_manager.get_api_key('chatgpt')
+        
         self.current_file_path = ""
         self.source_code = ""
         self.analysis_results = ""
-        
-        # Get API keys from environment variables
-        self.claude_api_key = os.getenv('ANTHROPIC_API_KEY', '')
-        self.openai_api_key = os.getenv('OPENAI_API_KEY', '')
-        self.deepseek_api_key = os.getenv('DEEPSEEK_API_KEY', '')
-        self.chatgpt_api_key = os.getenv('CHATGPT_API_KEY', '')
         
         self.init_ui()
         
@@ -827,14 +823,14 @@ class CodeOptimizerApp(QMainWindow):
         ai_layout = QHBoxLayout()
         
         self.ollama_radio = QRadioButton("Ollama")
-        self.ollama_radio.setChecked(bool(self.ollama_models))
+        self.ollama_radio.setChecked(bool(self.settings_manager.get_api_key('anthropic')))
         self.ollama_radio.toggled.connect(self.update_ai_selection)
-        self.ollama_radio.setEnabled(bool(self.ollama_models))
+        self.ollama_radio.setEnabled(bool(self.settings_manager.get_api_key('anthropic')))
         ai_layout.addWidget(self.ollama_radio)
         
         self.deepseek_radio = QRadioButton("DeepSeek Coder")
         self.deepseek_radio.toggled.connect(self.update_ai_selection)
-        self.deepseek_radio.setChecked(not bool(self.ollama_models))
+        self.deepseek_radio.setChecked(not bool(self.settings_manager.get_api_key('anthropic')))
         ai_layout.addWidget(self.deepseek_radio)
         
         self.claude_radio = QRadioButton("Claude")
@@ -868,10 +864,10 @@ class CodeOptimizerApp(QMainWindow):
         
         model_select_layout = QHBoxLayout()
         self.model_combo = QComboBox()
-        if self.ollama_models:
-            self.model_combo.addItems([model[0] for model in self.ollama_models])
+        if self.settings_manager.get_api_key('anthropic'):
+            self.model_combo.addItems([model[0] for model in self.settings_manager.get_api_key('anthropic')])
         else:
-            self.model_combo.addItems(self.deepseek_models)
+            self.model_combo.addItems(self.settings_manager.get_api_key('deepseek'))
         self.model_combo.currentTextChanged.connect(self.update_model)
         model_select_layout.addWidget(self.model_combo)
         
@@ -1255,7 +1251,7 @@ class CodeOptimizerApp(QMainWindow):
     def update_model_list(self):
         if self.ollama_radio.isChecked():
             sort_by = 'size' if self.sort_combo.currentText() == 'Size' else 'name'
-            sorted_models = self.sort_ollama_models(self.ollama_models, sort_by)
+            sorted_models = self.sort_ollama_models(self.settings_manager.get_api_key('anthropic'), sort_by)
             current_model = self.model_combo.currentText()
             self.model_combo.clear()
             self.model_combo.addItems(sorted_models)
@@ -1266,7 +1262,7 @@ class CodeOptimizerApp(QMainWindow):
 
     def refresh_models(self):
         if self.ollama_radio.isChecked():
-            self.ollama_models = self.get_installed_ollama_models()
+            self.settings_manager.set_api_key('anthropic', self.get_installed_ollama_models())
             current_text = self.model_combo.currentText()
             self.update_model_list()
             # Try to restore the previously selected model
@@ -1285,25 +1281,25 @@ class CodeOptimizerApp(QMainWindow):
         elif self.deepseek_radio.isChecked():
             self.current_ai = "deepseek"
             self.model_combo.clear()
-            self.model_combo.addItems(self.deepseek_models)
+            self.model_combo.addItems(self.settings_manager.get_api_key('deepseek'))
             self.sort_combo.setEnabled(False)
             self.refresh_btn.setEnabled(False)
         elif self.claude_radio.isChecked():
             self.current_ai = "claude"
             self.model_combo.clear()
-            self.model_combo.addItems(self.claude_models)
+            self.model_combo.addItems(self.settings_manager.get_api_key('claude'))
             self.sort_combo.setEnabled(False)
             self.refresh_btn.setEnabled(False)
         elif self.openai_radio.isChecked():
             self.current_ai = "openai"
             self.model_combo.clear()
-            self.model_combo.addItems(self.openai_models)
+            self.model_combo.addItems(self.settings_manager.get_api_key('openai'))
             self.sort_combo.setEnabled(False)
             self.refresh_btn.setEnabled(False)
         elif self.chatgpt_radio.isChecked():
             self.current_ai = "chatgpt"
             self.model_combo.clear()
-            self.model_combo.addItems(self.chatgpt_models)
+            self.model_combo.addItems(self.settings_manager.get_api_key('chatgpt'))
             self.sort_combo.setEnabled(False)
             self.refresh_btn.setEnabled(False)
         self.current_model = self.model_combo.currentText()
@@ -1773,94 +1769,74 @@ class CodeOptimizerApp(QMainWindow):
         diff_dialog.exec()
 
     def show_settings(self):
-        settings_dialog = QDialog(self)
-        settings_dialog.setWindowTitle("API Settings")
-        settings_dialog.setMinimumWidth(400)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Settings")
+        dialog.setModal(True)
+        layout = QVBoxLayout()
         
-        layout = QVBoxLayout(settings_dialog)
+        # API Key Settings
+        api_group = QGroupBox("API Keys")
+        api_layout = QVBoxLayout()
         
         # Claude API Key
-        claude_group = QGroupBox("Claude API Settings")
-        claude_layout = QVBoxLayout()
-        
-        claude_key_label = QLabel("API Key (from ANTHROPIC_API_KEY environment variable):")
+        claude_layout = QHBoxLayout()
+        claude_key_label = QLabel("Claude API Key:")
         claude_key_input = QLineEdit()
-        claude_key_input.setText(self.claude_api_key)
+        claude_key_input.setText(self.claude_api_key or "")
         claude_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        claude_key_input.setReadOnly(True)
-        claude_key_input.setPlaceholderText("Set ANTHROPIC_API_KEY environment variable")
+        claude_key_input.setPlaceholderText("Enter Claude API key")
+        
+        def validate_and_save_claude():
+            try:
+                self.settings_manager.set_api_key('anthropic', claude_key_input.text())
+                self.claude_api_key = claude_key_input.text()
+                QMessageBox.information(self, "Success", "Claude API key saved successfully")
+            except ValueError as e:
+                QMessageBox.warning(self, "Error", str(e))
+        
+        claude_save_btn = QPushButton("Save")
+        claude_save_btn.clicked.connect(validate_and_save_claude)
         
         claude_layout.addWidget(claude_key_label)
         claude_layout.addWidget(claude_key_input)
-        claude_group.setLayout(claude_layout)
-        layout.addWidget(claude_group)
+        claude_layout.addWidget(claude_save_btn)
         
         # OpenAI API Key
-        openai_group = QGroupBox("OpenAI API Settings")
-        openai_layout = QVBoxLayout()
-        
-        openai_key_label = QLabel("API Key (from OPENAI_API_KEY environment variable):")
+        openai_layout = QHBoxLayout()
+        openai_key_label = QLabel("OpenAI API Key:")
         openai_key_input = QLineEdit()
-        openai_key_input.setText(self.openai_api_key)
+        openai_key_input.setText(self.openai_api_key or "")
         openai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        openai_key_input.setReadOnly(True)
-        openai_key_input.setPlaceholderText("Set OPENAI_API_KEY environment variable")
+        openai_key_input.setPlaceholderText("Enter OpenAI API key")
+        
+        def validate_and_save_openai():
+            try:
+                self.settings_manager.set_api_key('openai', openai_key_input.text())
+                self.openai_api_key = openai_key_input.text()
+                QMessageBox.information(self, "Success", "OpenAI API key saved successfully")
+            except ValueError as e:
+                QMessageBox.warning(self, "Error", str(e))
+        
+        openai_save_btn = QPushButton("Save")
+        openai_save_btn.clicked.connect(validate_and_save_openai)
         
         openai_layout.addWidget(openai_key_label)
         openai_layout.addWidget(openai_key_input)
-        openai_group.setLayout(openai_layout)
-        layout.addWidget(openai_group)
+        openai_layout.addWidget(openai_save_btn)
         
-        # ChatGPT API Key
-        chatgpt_group = QGroupBox("ChatGPT API Settings")
-        chatgpt_layout = QVBoxLayout()
+        api_layout.addLayout(claude_layout)
+        api_layout.addLayout(openai_layout)
+        api_group.setLayout(api_layout)
         
-        chatgpt_key_label = QLabel("API Key (from CHATGPT_API_KEY environment variable):")
-        chatgpt_key_input = QLineEdit()
-        chatgpt_key_input.setText(self.chatgpt_api_key)
-        chatgpt_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        chatgpt_key_input.setReadOnly(True)
-        chatgpt_key_input.setPlaceholderText("Set CHATGPT_API_KEY environment variable")
+        layout.addWidget(api_group)
         
-        chatgpt_layout.addWidget(chatgpt_key_label)
-        chatgpt_layout.addWidget(chatgpt_key_input)
-        chatgpt_group.setLayout(chatgpt_layout)
-        layout.addWidget(chatgpt_group)
-        
-        # DeepSeek API Key
-        deepseek_group = QGroupBox("DeepSeek API Settings")
-        deepseek_layout = QVBoxLayout()
-        
-        deepseek_key_label = QLabel("API Key (from DEEPSEEK_API_KEY environment variable):")
-        deepseek_key_input = QLineEdit()
-        deepseek_key_input.setText(self.deepseek_api_key)
-        deepseek_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        deepseek_key_input.setReadOnly(True)
-        deepseek_key_input.setPlaceholderText("Set DEEPSEEK_API_KEY environment variable")
-        
-        deepseek_layout.addWidget(deepseek_key_label)
-        deepseek_layout.addWidget(deepseek_key_input)
-        deepseek_group.setLayout(deepseek_layout)
-        layout.addWidget(deepseek_group)
-        
-        # Instructions
-        instructions = QLabel(
-            "To use AI services, set the following environment variables:\n"
-            "- ANTHROPIC_API_KEY for Claude\n"
-            "- OPENAI_API_KEY for OpenAI\n"
-            "- CHATGPT_API_KEY for ChatGPT\n"
-            "- DEEPSEEK_API_KEY for DeepSeek\n\n"
-            "You can set these in your shell or add them to your ~/.bashrc or ~/.zshrc file."
-        )
-        instructions.setWordWrap(True)
-        layout.addWidget(instructions)
-        
-        # Close button
+        # Add close button
         close_btn = QPushButton("Close")
-        close_btn.clicked.connect(settings_dialog.close)
+        close_btn.clicked.connect(dialog.accept)
         layout.addWidget(close_btn)
         
-        settings_dialog.exec()
+        dialog.setLayout(layout)
+        dialog.exec()
 
     def show_prompt_settings(self):
         dialog = PromptSettingsDialog(self)

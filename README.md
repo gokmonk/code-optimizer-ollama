@@ -31,3 +31,40 @@ The application is built using PyQt6 and consists of several key components:
 - OpenAI: For GPT model integration
 - Anthropic: For Claude model integration
 - Transformers: For local model support
+
+## Security
+⚠️ **IMPORTANT SECURITY NOTICE** ⚠️
+
+1. **API Keys**
+   - Never commit API keys to version control
+   - Store API keys in environment variables only
+   - Use different API keys for development and production
+   - Rotate API keys regularly
+
+2. **Environment Setup**
+   ```bash
+   # Create a .env file (DO NOT COMMIT THIS FILE)
+   echo "ANTHROPIC_API_KEY=your_claude_key" >> .env
+   echo "OPENAI_API_KEY=your_openai_key" >> .env
+   echo "DEEPSEEK_API_KEY=your_deepseek_key" >> .env
+   echo "CHATGPT_API_KEY=your_chatgpt_key" >> .env
+   ```
+
+3. **Best Practices**
+   - Keep your dependencies updated
+   - Use virtual environments
+   - Review code changes before committing
+   - Report security issues immediately
+
+## Installation
+1. Clone the repository
+2. Create and activate a virtual environment
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Set up your API keys in environment variables
+5. Run the application:
+   ```bash
+   python ino-py-optimize-gui.py
+   ```
